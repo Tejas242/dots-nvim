@@ -91,19 +91,55 @@ if [ -n "$force_color_prompt" ]; then
     fi
 fi
 
+# Function to get Git information
+git_info() {
+    # Check if we're in a git repository
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        return
+    fi
+
+    local branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+    if [ -n "$branch" ]; then
+        # Get git status
+        local git_status="$(git status --porcelain 2>/dev/null)"
+        local git_ahead="$(git rev-list --count HEAD --not @{upstream} 2>/dev/null)"
+        local git_behind="$(git rev-list --count @{upstream} --not HEAD 2>/dev/null)"
+        
+        # Status indicators
+        local stat_symbol=""
+        [ -n "$(echo "$git_status" | grep '^[ACDMR]')" ] && stat_symbol+="+"    # Added/Changed
+        [ -n "$(echo "$git_status" | grep '^.[DM]')" ] && stat_symbol+="!"      # Modified
+        [ -n "$(echo "$git_status" | grep '^\?')" ] && stat_symbol+="?"         # Untracked
+        [ -n "$(echo "$git_status" | grep '^U')" ] && stat_symbol+="✗"          # Conflicts
+
+        # Branch with status indicators
+        local branch_info="─[%F{%(#.blue.magenta)}${branch}%F{%(#.blue.green)}"
+        
+        # Add status indicators if any
+        [ -n "$stat_symbol" ] && branch_info+=" ${stat_symbol}"
+        
+        # Add ahead/behind arrows
+        [ "$git_ahead" -gt 0 ] && branch_info+=" ⇡${git_ahead}"
+        [ "$git_behind" -gt 0 ] && branch_info+=" ⇣${git_behind}"
+        
+        branch_info+="]"
+        echo "$branch_info"
+    fi
+}
+
 configure_prompt() {
     prompt_symbol=㉿
     # Skull emoji for root terminal
     #[ "$EUID" -eq 0 ] && prompt_symbol=💀
     case "$PROMPT_ALTERNATIVE" in
         twoline)
-            PROMPT=$'%F{%(#.blue.green)}┌──${debian_chroot:+($debian_chroot)─}${CONDA_DEFAULT_ENV:+($(basename $CONDA_DEFAULT_ENV))-}${VIRTUAL_ENV:+($(basename $VIRTUAL_ENV))─}(%B%F{%(#.red.blue)}%n'$prompt_symbol$'%m%b%F{%(#.blue.green)})-[%B%F{reset}%(6~.%-1~/…/%4~.%5~)%b%F{%(#.blue.green)}]\n└─%B%(#.%F{red}#.%F{blue}$)%b%F{reset} '
+            PROMPT=$'%F{%(#.blue.green)}┌──${debian_chroot:+($debian_chroot)─}${CONDA_DEFAULT_ENV:+($(basename $CONDA_DEFAULT_ENV))-}${VIRTUAL_ENV:+($(basename $VIRTUAL_ENV))─}(%B%F{%(#.red.blue)}%n'$prompt_symbol$'%m%b%F{%(#.blue.green)})-[%B%F{reset}%(6~.%-1~/…/%4~.%5~)%b%F{%(#.blue.green)}]$(git_info)\n└─%B%(#.%F{red}#.%F{blue}$)%b%F{reset} '
             ;;
         oneline)
-            PROMPT=$'${debian_chroot:+($debian_chroot)}${CONDA_DEFAULT_ENV:+($(basename $CONDA_DEFAULT_ENV))-}${VIRTUAL_ENV:+($(basename $VIRTUAL_ENV))-}%B%F{%(#.red.blue)}%n@%m%b%F{reset}:%B%F{%(#.blue.green)}%~%b%F{reset}%(#.#.$) '
+            PROMPT=$'${debian_chroot:+($debian_chroot)}${CONDA_DEFAULT_ENV:+($(basename $CONDA_DEFAULT_ENV))-}${VIRTUAL_ENV:+($(basename $VIRTUAL_ENV))-}%B%F{%(#.red.blue)}%n@%m%b%F{reset}:%B%F{%(#.blue.green)}%~%b%F{reset}$(git_info)%(#.#.$) '
             ;;
         backtrack)
-            PROMPT=$'${debian_chroot:+($debian_chroot)}${CONDA_DEFAULT_ENV:+($(basename $CONDA_DEFAULT_ENV))-}${VIRTUAL_ENV:+($(basename $VIRTUAL_ENV))-}%B%F{red}%n@%m%b%F{reset}:%B%F{blue}%~%b%F{reset}%(#.#.$) '
+            PROMPT=$'${debian_chroot:+($debian_chroot)}${CONDA_DEFAULT_ENV:+($(basename $CONDA_DEFAULT_ENV))-}${VIRTUAL_ENV:+($(basename $VIRTUAL_ENV))-}%B%F{red}%n@%m%b%F{reset}:%B%F{blue}%~%b%F{reset}$(git_info)%(#.#.$) '
             ;;
     esac
     unset prompt_symbol
@@ -300,4 +336,4 @@ fi
 # Custom Alias
 alias gt="sh ~/.scripts/generate_template.sh"
 alias runcp="sh ~/.scripts/runcp.sh"
-alias htb="sudo openvpn ~/.scripts/lab_screenager242.ovpn"
+
